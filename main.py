@@ -14,7 +14,14 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 if not BOT_TOKEN:
     raise ValueError("❌ BOT_TOKEN не найден в .env")
 
-DB_URL = f"postgresql://{os.getenv('DB_USER')}:{os.getenv('DB_PASSWORD')}@{os.getenv('DB_HOST')}:{os.getenv('DB_PORT')}/{os.getenv('DB_NAME')}"
+# Для Render: DATABASE_URL задаётся автоматически
+DATABASE_URL = os.getenv("DATABASE_URL")
+if DATABASE_URL:
+    # Render даёт URL вида postgres://user:pass@host:port/db
+    DB_URL = DATABASE_URL
+else:
+    # Локальный запуск
+    DB_URL = f"postgresql://{os.getenv('DB_USER')}:{os.getenv('DB_PASSWORD')}@{os.getenv('DB_HOST')}:{os.getenv('DB_PORT')}/{os.getenv('DB_NAME')}"
 
 engine = create_engine(DB_URL)
 SessionLocal = sessionmaker(bind=engine)
