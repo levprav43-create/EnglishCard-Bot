@@ -15,4 +15,4 @@ Python 3, PostgreSQL, SQLAlchemy (ORM), pyTelegramBotAPI, Git
 - Безопасное хранение токена через `.env`  
 - Графическая ER-диаграмма базы данных  
 
-🔗 🔗 [GitHub](https://github.com/levprav43-create/EnglishCard-Bot) | 🤖 [Попробовать в Telegram](https://t.me/EnglishCard Bot)
+🔗 🔗 [GitHub](https://github.com/levprav43-create/EnglishCard-Bot) | 🤖 [Попробовать в Telegram](https://t.me/MyEnglishCard777Bot)
