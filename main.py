@@ -2,7 +2,7 @@ import os
 from dotenv import load_dotenv
 import telebot
 import psycopg2
-from random import choice, sample, shuffle
+from random import choice, shuffle
 
 load_dotenv()
 
@@ -55,31 +55,6 @@ def add_user_and_common_words(user_id, username, first_name, last_name):
     conn.close()
 
 
-def get_all_english_words():
-    conn = get_connection()
-    cur = conn.cursor()
-    cur.execute("SELECT english_word FROM words")
-    words = [row[0] for row in cur.fetchall()]
-    cur.close()
-    conn.close()
-    return words
-
-
-def get_user_words(user_id):
-    conn = get_connection()
-    cur = conn.cursor()
-    cur.execute("""
-        SELECT w.russian_word, w.english_word
-        FROM user_words uw
-        JOIN words w ON uw.word_id = w.word_id
-        WHERE uw.user_id = %s
-    """, (user_id,))
-    words = cur.fetchall()
-    cur.close()
-    conn.close()
-    return words
-
-
 def count_user_words(user_id):
     conn = get_connection()
     cur = conn.cursor()
@@ -115,7 +90,6 @@ def add_user_word(user_id, russian, english):
         if result:
             word_id = result[0]
         else:
-            # Если нет — создаём
             cur.execute(
                 "INSERT INTO words (russian_word, english_word) VALUES (%s, %s) RETURNING word_id",
                 (russian, english)
@@ -146,22 +120,42 @@ def delete_user_word(user_id, russian, english):
 
 
 def get_random_word_for_user(user_id):
-    user_words = get_user_words(user_id)
-    if not user_words:
+    """Возвращает случайное слово пользователя и 4 варианта ответа (1 правильный + 3 случайных)."""
+    conn = get_connection()
+    cur = conn.cursor()
+
+    # Получаем одно случайное слово пользователя
+    cur.execute("""
+        SELECT w.russian_word, w.english_word
+        FROM user_words uw
+        JOIN words w ON uw.word_id = w.word_id
+        WHERE uw.user_id = %s
+        ORDER BY RANDOM()
+        LIMIT 1
+    """, (user_id,))
+    result = cur.fetchone()
+    if not result:
+        cur.close()
+        conn.close()
         return None, None, []
 
-    russian_word, correct_answer = choice(user_words)
-    all_english_words = get_all_english_words()
-    
-    options = [correct_answer]
-    wrong_options = [w for w in all_english_words if w.lower() != correct_answer.lower()]
-    if len(wrong_options) >= 3:
-        options.extend(sample(wrong_options, 3))
-    else:
-        options.extend(wrong_options)
-    
-    options = list(set(options))[:4]
+    russian_word, correct_answer = result
+
+    # Получаем 3 случайных неправильных ответа напрямую из БД
+    cur.execute("""
+        SELECT english_word
+        FROM words
+        WHERE english_word != %s
+        ORDER BY RANDOM()
+        LIMIT 3
+    """, (correct_answer,))
+    wrong_options = [row[0] for row in cur.fetchall()]
+
+    options = [correct_answer] + wrong_options
     shuffle(options)
+
+    cur.close()
+    conn.close()
     return russian_word, correct_answer, options
 
 
@@ -265,10 +259,22 @@ def add_word(message):
 
 @bot.message_handler(func=lambda m: m.text == "Удалить слово ❌")
 def del_prompt(message):
-    words = get_user_words(message.from_user.id)
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT w.russian_word, w.english_word
+        FROM user_words uw
+        JOIN words w ON uw.word_id = w.word_id
+        WHERE uw.user_id = %s
+    """, (message.from_user.id,))
+    words = cur.fetchall()
+    cur.close()
+    conn.close()
+    
     if not words:
         bot.send_message(message.chat.id, "Нечего удалять.")
         return
+        
     markup = telebot.types.ReplyKeyboardMarkup(resize_keyboard=True)
     for ru, en in words:
         markup.add(f"Удалить: {ru} → {en}")
